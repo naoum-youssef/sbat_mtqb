@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Base Styles */
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    font-family: 'Cairo', 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #f8fafc;
+    color: #1f2937;
+    line-height: 1.6;
+}
+
+/* Global Utilities */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* RTL Support */
+[dir="rtl"] {
+    text-align: right;
+}
+
+/* Smooth Scrolling */
+html {
+    scroll-behavior: smooth;
+}
