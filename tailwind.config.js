@@ -20,6 +20,8 @@ module.exports = {
             },
             animation: {
                 'fade-in-up': 'fadeInUp 0.6s ease-out',
+                'marquee': 'marquee 20s linear infinite',
+                'marquee2': 'marquee2 20s linear infinite',
             },
             keyframes: {
                 fadeInUp: {
@@ -31,6 +33,14 @@ module.exports = {
                         opacity: '1',
                         transform: 'translateY(0)',
                     },
+                },
+                'marquee': {
+                    '0%': { transform: 'translateX(100%)' },
+                    '100%': { transform: 'translateX(-100%)' },
+                },
+                'marquee2': {
+                    '0%': { transform: 'translateX(0%)' },
+                    '100%': { transform: 'translateX(-200%)' },
                 },
             },
         },

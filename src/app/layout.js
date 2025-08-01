@@ -1,7 +1,16 @@
 import { Inter } from 'next/font/google'
 import './globals.css'
+import MetaPixel from './Components/MetaPixel'
 
 const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+    title: 'حذاء جلد جودة عالية',
+    description: 'أحذية جلدية عالية-الجودة بأفضل الأسعار',
+    icons: {
+        icon: 'public/favicon.ico',
+    },
+}
 
 export default function RootLayout({ children }) {
     return (
@@ -13,6 +22,7 @@ export default function RootLayout({ children }) {
             />
         </head>
         <body className={inter.className}>
+        <MetaPixel />
         {children}
         </body>
         </html>

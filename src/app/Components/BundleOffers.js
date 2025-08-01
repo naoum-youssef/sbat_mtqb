@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Package, ShoppingCart, ChevronDown, Check, Percent, MessageCircle } from 'lucide-react';
 import styles from "@/app/Components/OrderForm.module.css";
+import WOO_CONFIG from "@/app/Components/wooConfig";
 
 const BundleOffers = ({ formData, onOrderComplete }) => {
     const router = useRouter();
@@ -19,13 +20,22 @@ const BundleOffers = ({ formData, onOrderComplete }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderError, setOrderError] = useState('');
 
+    // Meta Pixel tracking function
+    const trackPurchase = (buttonType, price) => {
+        if (typeof window !== 'undefined' && window.fbq) {
+            window.fbq('track', 'Purchase', {
+                value: price,
+                currency: 'MAD',
+                content_name: buttonType === 'order' ? 'إتمام الطلب' : 'طلب عبر واتساب'
+            })
+        }
+    }
+
     const colors = [
         {name: 'white', color: '#FFFFFF', arabicName: 'أبيض', border: '#E5E7EB'},
         {name: 'brown', color: '#8B4513', arabicName: 'بني', border: '#8B4513'},
         {name: 'black', color: '#000000', arabicName: 'أسود', border: '#000000'}
     ];
-
-    //size options
 
     const sizes = Array.from({ length: 5 }, (_, i) => 40 + i);
 
@@ -72,59 +82,187 @@ const BundleOffers = ({ formData, onOrderComplete }) => {
         return true;
     };
 
+    // Function to create product if needed
+    const createOrGetProduct = async (productName, price) => {
+        try {
+            // Try to find existing products
+            const searchResponse = await fetch(`${WOO_CONFIG.url}/wp-json/wc/v3/products?search=${encodeURIComponent(productName)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(WOO_CONFIG.consumerKey + ':' + WOO_CONFIG.consumerSecret)
+                }
+            });
+
+            if (searchResponse.ok) {
+                const existingProducts = await searchResponse.json();
+                if (existingProducts.length > 0) {
+                    return existingProducts[0].id;
+                }
+            }
+
+            // Create new product if not found
+            const productData = {
+                name: productName,
+                type: 'simple',
+                regular_price: price.toString(),
+                description: 'منتج تم إنشاؤه تلقائياً من الموقع',
+                short_description: productName,
+                manage_stock: false,
+                in_stock: true,
+                status: 'publish'
+            };
+
+            const createResponse = await fetch(`${WOO_CONFIG.url}/wp-json/wc/v3/products`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(WOO_CONFIG.consumerKey + ':' + WOO_CONFIG.consumerSecret)
+                },
+                body: JSON.stringify(productData)
+            });
+
+            if (createResponse.ok) {
+                const newProduct = await createResponse.json();
+                return newProduct.id;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Error creating/finding product:', error);
+            return null;
+        }
+    };
+
     const handleOrderSubmit = async () => {
         if (!validateForm()) {
             return;
         }
 
+        // Track purchase with Meta Pixel
+        const price = selectedBundle === 'bundle1' ? 299 : 550;
+        trackPurchase('order', price);
+
         setIsSubmitting(true);
         setOrderError('');
 
         try {
+            // Prepare order data based on bundle selection
+            let totalPrice = 0;
+            let orderSummary = '';
+            let productName = '';
+
+            if (selectedBundle === 'bundle1') {
+                totalPrice = 299;
+                productName = 'حذاء مغربي تقليدي';
+                orderSummary = `1 حذاء - المقاس: ${bundleSelections.bundle1.size} - اللون: ${bundleSelections.bundle1.color}`;
+            } else if (selectedBundle === 'bundle2') {
+                totalPrice = 550;
+                productName = 'عرض حذائين مغربيين';
+                orderSummary = `2 أحذية - الأول: ${bundleSelections.bundle2.item1.size}/${bundleSelections.bundle2.item1.color} - الثاني: ${bundleSelections.bundle2.item2.size}/${bundleSelections.bundle2.item2.color}`;
+            }
+
+            // Get or create product
+            const productId = await createOrGetProduct(productName, totalPrice);
+
+            if (!productId) {
+                throw new Error('فشل في إنشاء المنتج');
+            }
+
+            // Prepare line items
+            let lineItems = [];
+            if (selectedBundle === 'bundle1') {
+                lineItems = [{
+                    product_id: productId,
+                    quantity: 1,
+                    meta_data: [
+                        { key: 'المقاس', value: bundleSelections.bundle1.size },
+                        { key: 'اللون', value: bundleSelections.bundle1.color }
+                    ]
+                }];
+            } else if (selectedBundle === 'bundle2') {
+                lineItems = [{
+                    product_id: productId,
+                    quantity: 2,
+                    meta_data: [
+                        { key: 'الحذاء_الأول_المقاس', value: bundleSelections.bundle2.item1.size },
+                        { key: 'الحذاء_الأول_اللون', value: bundleSelections.bundle2.item1.color },
+                        { key: 'الحذاء_الثاني_المقاس', value: bundleSelections.bundle2.item2.size },
+                        { key: 'الحذاء_الثاني_اللون', value: bundleSelections.bundle2.item2.color }
+                    ]
+                }];
+            }
+
+            // Create order directly with WooCommerce API
             const orderData = {
-                fullName: formData.fullName,
-                phoneNumber: formData.phoneNumber,
-                deliveryAddress: formData.deliveryAddress,
-                selectedBundle,
-                bundleSelections
+                status: "pending",
+                currency: "MAD",
+                billing: {
+                    first_name: formData.fullName,
+                    last_name: "",
+                    email: formData.phoneNumber + '@customer.temp',
+                    phone: formData.phoneNumber,
+                    address_1: formData.deliveryAddress,
+                    city: "Morocco",
+                    country: "MA"
+                },
+                shipping: {
+                    first_name: formData.fullName,
+                    last_name: "",
+                    address_1: formData.deliveryAddress,
+                    city: "Morocco",
+                    country: "MA"
+                },
+                line_items: lineItems,
+                shipping_total: "0.00",
+                total: totalPrice.toString(),
+                meta_data: [
+                    { key: 'طريقة_الطلب', value: 'موقع_الكتروني' },
+                    { key: 'ملخص_الطلب', value: orderSummary }
+                ]
             };
 
-            const response = await fetch('/api/create-order', {
+            // Make direct API call to WooCommerce
+            const response = await fetch(`${WOO_CONFIG.url}/wp-json/wc/v3/orders`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(WOO_CONFIG.consumerKey + ':' + WOO_CONFIG.consumerSecret)
                 },
                 body: JSON.stringify(orderData)
             });
 
-            const result = await response.json();
+            if (response.ok) {
+                const order = await response.json();
 
-            if (result.success) {
-                // Call the success callback with order details (if needed for other components)
+                // Call the success callback
                 if (onOrderComplete) {
                     onOrderComplete({
-                        orderId: result.orderId,
-                        orderNumber: result.orderNumber,
-                        total: result.total
+                        orderId: order.id,
+                        orderNumber: order.number || order.id,
+                        total: totalPrice
                     });
                 }
 
                 // Create URL parameters for the success page
                 const searchParams = new URLSearchParams({
-                    orderNumber: result.orderNumber || result.orderId,
-                    orderId: result.orderId,
-                    total: result.total || '',
+                    orderNumber: order.number || order.id,
+                    orderId: order.id,
+                    total: totalPrice.toString(),
                     customerName: encodeURIComponent(formData.fullName),
                     phone: encodeURIComponent(formData.phoneNumber),
                     address: encodeURIComponent(formData.deliveryAddress),
                     status: 'success'
                 });
 
-                // Redirect to success page with order details
+                // Redirect to success page
                 router.push(`/success?${searchParams.toString()}`);
             } else {
-                setOrderError(result.message || 'حدث خطأ أثناء إنشاء الطلب');
+                const errorData = await response.json();
+                console.error('WooCommerce API Error:', errorData);
+                setOrderError(errorData.message || 'حدث خطأ أثناء إنشاء الطلب');
             }
+
         } catch (error) {
             console.error('Order submission error:', error);
             setOrderError('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
@@ -133,47 +271,45 @@ const BundleOffers = ({ formData, onOrderComplete }) => {
         }
     };
 
-    // WhatsApp function to generate pre-filled message (like your example)
+    // WhatsApp function with tracking
     const handleWhatsAppOrder = () => {
         if (!validateForm()) {
             return;
         }
 
-        // Get the color name in Arabic
+        // Track purchase with Meta Pixel
+        const price = selectedBundle === 'bundle1' ? 299 : 550;
+        trackPurchase('whatsapp', price);
+
         const getColorName = (colorName) => {
             const color = colors.find(c => c.name === colorName);
             return color ? color.arabicName : colorName;
         };
 
-        // Generate order details message similar to your example
         let shoeDetails = '';
-        let price = '';
+        let price_text = '';
         let quantity = '';
 
         if (selectedBundle === 'bundle1') {
             quantity = '1 حذاء';
-            price = '299 درهم';
+            price_text = '299 درهم';
             shoeDetails = `الحذاء: المقاس ${bundleSelections.bundle1.size}, اللون ${getColorName(bundleSelections.bundle1.color)}`;
         } else {
             quantity = '2 من الأحذية';
-            price = '550 درهم';
+            price_text = '550 درهم';
             shoeDetails = `الحذاء الأول: المقاس ${bundleSelections.bundle2.item1.size}, اللون ${getColorName(bundleSelections.bundle2.item1.color)}, الحذاء الثاني: المقاس ${bundleSelections.bundle2.item2.size}, اللون ${getColorName(bundleSelections.bundle2.item2.color)}`;
         }
 
-        // Create message in the same format as your example
         const message = `طلب جديد:
 الكمية: ${quantity}
-السعر: ${price}
+السعر: ${price_text}
 الاسم: ${formData.fullName}
 رقم الهاتف: ${formData.phoneNumber}
 العنوان: ${formData.deliveryAddress}
 ${shoeDetails}`;
 
-        // WhatsApp phone number (replace with your actual number)
         const whatsappNumber = '212694138093';
         const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-
-        // Open WhatsApp
         window.open(whatsappUrl, '_blank');
     };
 
