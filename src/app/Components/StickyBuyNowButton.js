@@ -6,29 +6,67 @@ const StickyBuyNowButton = () => {
     const router = useRouter();
 
     const handleBuyNowClick = () => {
-        // Smooth scroll to order form section
+        // Target the specific Bundle Offers section where user selects products
+        const bundleOffersElement = document.querySelector('[data-section="bundle-offers"]');
+
+        if (bundleOffersElement) {
+            bundleOffersElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+                inline: 'nearest'
+            });
+            return;
+        }
+
+        // Alternative: Look for the bundle component by class or structure
+        const bundleComponent = document.querySelector('.space-y-4 > div:first-child, [class*="bundle"], [dir="rtl"] .space-y-4');
+        if (bundleComponent) {
+            bundleComponent.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+            return;
+        }
+
+        // Look for the specific bundle cards (1 حذاء or 2 من الأحذية)
+        const bundleCard = document.querySelector('div:has(h3:contains("1 حذاء")), div:has(h3:contains("2 من الأحذية"))');
+        if (bundleCard) {
+            bundleCard.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+            return;
+        }
+
+        // Look for package icon containers that indicate bundle offers
+        const packageElement = document.querySelector('div:has(.w-12.h-12.bg-teal-500)');
+        if (packageElement) {
+            packageElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+            return;
+        }
+
+        // Fallback: look for order form section
         const orderFormElement = document.querySelector('[data-section="order-form"]');
         if (orderFormElement) {
             orderFormElement.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
             });
-        } else {
-            // If no order form section found, you can redirect to a specific route
-            // router.push('/order');
-
-            // Or scroll to bottom of page where order form usually is
-            window.scrollTo({
-                top: document.body.scrollHeight,
-                behavior: 'smooth'
-            });
+            return;
         }
+
+        // Final fallback: scroll to where bundle offers should be (after header)
+        window.scrollTo({
+            top: 200, // Scroll past header to bundle section
+            behavior: 'smooth'
+        });
     };
 
     return (
         <div className="sticky-buy-button-container">
-
-
             {/* Buy Now Button */}
             <button
                 onClick={handleBuyNowClick}

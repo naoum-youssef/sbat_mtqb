@@ -2,8 +2,7 @@ import Image from 'next/image';
 
 const LowerImages = () => {
     const images = [
-        '/images/mtqb_8.png',
-        '/images/mtqb_9.png'
+        '/images/mtqb_lp2.png'
     ];
 
     return (

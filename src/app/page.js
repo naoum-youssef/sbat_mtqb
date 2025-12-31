@@ -3,6 +3,7 @@ import LowerImages from "@/app/Components/LowerImages";
 import OrderForm from "@/app/Components/OrderForm";
 import StickyBuyNowButton from "@/app/Components/StickyBuyNowButton";
 import ScrollingHeaderBar from "@/app/Components/ScrollingHeaderBar";
+import BundleOffers from "@/app/Components/BundleOffers";
 export default function Home() {
     return (
         <div>
@@ -12,10 +13,9 @@ export default function Home() {
 
             <UpperImages/>
 
+
             {/* Add data-section attribute to help the button find the order form */}
-            <div data-section="order-form">
                 <OrderForm/>
-            </div>
 
             <LowerImages/>
 
